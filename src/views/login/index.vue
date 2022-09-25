@@ -1,52 +1,53 @@
 <template>
   <div class="login-container">
-    <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form" auto-complete="on" label-position="left">
-
-      <div class="title-container">
-        <h3 class="title">Login Form</h3>
+    <el-form ref="loginForm" :model="loginForm" :rules="rules" class="login-form" auto-complete="on" label-position="left">
+      <!-- 帝可得图片 -->
+      <div class="header-img">
+        <img src="@/assets/common/logo.png" alt="">
       </div>
-
-      <el-form-item prop="username">
-        <span class="svg-container">
-          <svg-icon icon-class="user" />
-        </span>
+      <!-- 用户名 -->
+      <el-form-item prop="loginName">
+        <span class="svg-container el-icon-mobile-phone" />
         <el-input
-          ref="username"
-          v-model="loginForm.username"
-          placeholder="Username"
-          name="username"
+          ref="loginName"
+          v-model="loginForm.loginName"
           type="text"
+          placeholder="请输入账号"
           tabindex="1"
           auto-complete="on"
         />
       </el-form-item>
-
+      <!-- 密码 -->
       <el-form-item prop="password">
-        <span class="svg-container">
-          <svg-icon icon-class="password" />
-        </span>
+        <span class="svg-container el-icon-lock" />
         <el-input
-          :key="passwordType"
-          ref="password"
+          ref="pwd"
           v-model="loginForm.password"
           :type="passwordType"
-          placeholder="Password"
-          name="password"
+          placeholder="请输入密码"
           tabindex="2"
           auto-complete="on"
-          @keyup.enter.native="handleLogin"
         />
-        <span class="show-pwd" @click="showPwd">
-          <svg-icon :icon-class="passwordType === 'password' ? 'eye' : 'eye-open'" />
+        <span class="svg-cntainer" @click="showPwd">
+          <svg-icon :icon-class="passwordType==='password'? 'eye':'eye-open'" />
         </span>
       </el-form-item>
-
-      <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">Login</el-button>
-
-      <div class="tips">
-        <span style="margin-right:20px;">username: admin</span>
-        <span> password: any</span>
-      </div>
+      <!-- 验证码 -->
+      <el-form-item prop="code">
+        <el-row justify="space-between">
+          <el-col :span="17">
+            <i class="svg-container el-icon-setting " />
+            <el-input ref="code" v-model="loginForm.code" placeholder="请输入验证码" />
+          </el-col>
+          <el-col :span="7" style="height:50px">
+            <div @click="imageCode">
+              <img :src="codeUrl" alt="" style="width:130px;height:50px;border: 1px solid #82A181;">
+            </div>
+          </el-col>
+        </el-row>
+      </el-form-item>
+      <!-- 登录按钮 -->
+      <el-button type="primary" :loading="loading" @click="login">登录</el-button>
 
     </el-form>
   </div>
@@ -54,72 +55,72 @@
 
 <script>
 import { validUsername } from '@/utils/validate'
-
+import { imageCodeAPI } from '@/api/public'
 export default {
   name: 'Login',
   data() {
-    const validateUsername = (rule, value, callback) => {
+    const phoneValid = (rule, value, callback) => {
       if (!validUsername(value)) {
-        callback(new Error('Please enter the correct user name'))
-      } else {
-        callback()
-      }
-    }
-    const validatePassword = (rule, value, callback) => {
-      if (value.length < 6) {
-        callback(new Error('The password can not be less than 6 digits'))
+        callback(new Error('格式不正确'))
       } else {
         callback()
       }
     }
     return {
       loginForm: {
-        username: 'admin',
-        password: '111111'
+        loginName: 'admin',
+        password: 'admin',
+        code: '',
+        clientToken: '',
+        loginType: 0
       },
-      loginRules: {
-        username: [{ required: true, trigger: 'blur', validator: validateUsername }],
-        password: [{ required: true, trigger: 'blur', validator: validatePassword }]
+      passwordType: 'password',
+      rules: {
+        loginName: [
+          { required: true, message: '请输入用户名', trigger: 'blur' },
+          { validator: phoneValid, trigger: 'blur' }
+        ],
+        password: [
+          { required: true, message: '请输入密码', trigger: 'blur' },
+          { min: 5, max: 16, message: '密码格式不对', trigger: 'blur' }
+        ],
+        code: [{ required: true, trigger: 'blur', message: '验证码格式有误' }]
       },
       loading: false,
-      passwordType: 'password',
-      redirect: undefined
+      codeUrl: ''
     }
   },
   watch: {
-    $route: {
-      handler: function(route) {
-        this.redirect = route.query && route.query.redirect
-      },
-      immediate: true
-    }
+
+  },
+  created() {
+    this.imageCode()
+    this.login()
   },
   methods: {
     showPwd() {
-      if (this.passwordType === 'password') {
-        this.passwordType = ''
-      } else {
-        this.passwordType = 'password'
-      }
+      this.passwordType === 'password' ? this.passwordType = '' : this.passwordType = 'password'
       this.$nextTick(() => {
-        this.$refs.password.focus()
+        this.$refs.pwd.focus()
       })
     },
-    handleLogin() {
-      this.$refs.loginForm.validate(valid => {
-        if (valid) {
-          this.loading = true
-          this.$store.dispatch('user/login', this.loginForm).then(() => {
-            this.$router.push({ path: this.redirect || '/' })
-            this.loading = false
-          }).catch(() => {
-            this.loading = false
-          })
-        } else {
-          console.log('error submit!!')
-          return false
-        }
-      })
+    async imageCode() {
+      const clientToken = Math.random().toString()
+      this.loginForm.clientToken = clientToken
+      const res = await imageCodeAPI(clientToken)
+      this.codeUrl = res.config.url
+      console.log(res)
+    },
+    async login() {
+      // const { data } = await loginAPI(this.loginForm)
+      // console.log(data)
+      try {
+        // await this.$refs.loginForm.validate()
+        this.loading = true
+        await this.$store.dispatch('user/LOGIN_ACTION', this.loginForm)
+      } finally {
+        this.loading = false
+      }
     }
   }
 }
@@ -130,8 +131,8 @@ export default {
 /* Detail see https://github.com/PanJiaChen/vue-element-admin/pull/927 */
 
 $bg:#283443;
-$light_gray:#fff;
-$cursor: #fff;
+$light_gray:#A4A0B1;
+$cursor: #A4A0B1;
 
 @supports (-webkit-mask: none) and (not (cater-color: $cursor)) {
   .login-container .el-input input {
@@ -157,17 +158,22 @@ $cursor: #fff;
       caret-color: $cursor;
 
       &:-webkit-autofill {
-        box-shadow: 0 0 0px 1000px $bg inset !important;
-        -webkit-text-fill-color: $cursor !important;
+        box-shadow: 0 0 0px 1000px #fff inset !important;
+        -webkit-text-fill-color: #C0C4CC !important;
       }
     }
   }
+  .el-form-item__error {
+    color: red
+  }
 
   .el-form-item {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    color: #454545;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  color: #454545;
+  border: 1px solid #e9e9e9;
+  background: #fff;
   }
 }
 </style>
@@ -178,18 +184,41 @@ $dark_gray:#889aa4;
 $light_gray:#eee;
 
 .login-container {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-image: url('~@/assets/common/background.png');
+  background-repeat: no-repeat;
+  background-size: cover;
   min-height: 100%;
   width: 100%;
   background-color: $bg;
   overflow: hidden;
 
+  .el-button--primary{
+  border-radius: 8px;
+  height: 52px;
+  text-shadow: 0 7px 22px #cfcfcf;
+  font-size: 14px;
+  font-weight: 700;
+  width: 100%;
+  background-color: #5970ea;
+}
+
   .login-form {
-    position: relative;
-    width: 520px;
-    max-width: 100%;
-    padding: 160px 35px 0;
-    margin: 0 auto;
-    overflow: hidden;
+    position: absolute;
+    width: 518px;
+    height: 388px;
+    background-color: red;
+    top: 50%;
+    left: 50%;
+    margin-top: -194px;
+    margin-left: -259px;
+    padding: 76px 35px 0px;
+    background: rgb(255, 255, 255);
+    box-shadow: rgb(30 111 72 / 35%) 0px 3px 70px 0px;
+    border-radius: 10px;
   }
 
   .tips {
@@ -233,5 +262,15 @@ $light_gray:#eee;
     cursor: pointer;
     user-select: none;
   }
+  .header-img img{
+    position: absolute;
+    width: 96px;
+    height: 96px;
+    top: -46px;
+    left: 50%;
+    margin-left: -48px;
+  }
+
 }
+
 </style>
